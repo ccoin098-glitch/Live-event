@@ -474,8 +474,9 @@ async function verifyInRadius(
       }
     }
 
+    let distanceKm: number | null = null;
     if (lat != null && lng != null) {
-      const distanceKm = haversineKm(profile.lat, profile.lng, lat, lng);
+      distanceKm = haversineKm(profile.lat, profile.lng, lat, lng);
       if (distanceKm > profile.radiusKm + radiusSlack) {
         console.warn(
           `[ingest/llm] drop (too far ${distanceKm.toFixed(1)}km > ${profile.radiusKm}km): ${event.title}`,
@@ -492,7 +493,9 @@ async function verifyInRadius(
         ...(typeof event.rawPayload === "object" && event.rawPayload
           ? event.rawPayload
           : {}),
-        verifiedDistanceKm: Number(distanceKm.toFixed(2)),
+        ...(distanceKm != null
+          ? { verifiedDistanceKm: Number(distanceKm.toFixed(2)) }
+          : {}),
       },
     });
   }
