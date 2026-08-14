@@ -40,8 +40,8 @@ export function categoryAccent(category: string): string {
 export function EventListItem({
   event,
   showTimeline = false,
-  isFirst = false,
-  isLast = false,
+  isFirst: _isFirst = false,
+  isLast: _isLast = false,
 }: {
   event: EventListItemData;
   showTimeline?: boolean;
@@ -73,27 +73,12 @@ export function EventListItem({
           seedEventFromList(event);
           void prefetchEvent(event.id);
         }}
-        className={`group relative flex gap-3 pb-4 last:pb-0 ${
-          seen ? "opacity-70" : ""
-        }`}
+        className={`group relative flex gap-3 ${seen ? "opacity-70" : ""}`}
       >
-        <div className="relative flex w-4 shrink-0 justify-center">
-          {!isFirst && (
-            <span
-              className="absolute left-1/2 top-0 w-px -translate-x-1/2 bg-white/70"
-              style={{ height: "1.15rem" }}
-              aria-hidden
-            />
-          )}
-          {!isLast && (
-            <span
-              className="absolute left-1/2 bottom-0 top-5 w-px -translate-x-1/2 bg-white/70"
-              aria-hidden
-            />
-          )}
+        <div className="relative z-10 flex w-4 shrink-0 justify-center pt-3.5">
           <span
-            className={`relative z-10 mt-3.5 h-3.5 w-3.5 rounded-full border-[2.5px] shadow-sm ${
-              seen ? "bg-[var(--muted)]/25" : "bg-white/80"
+            className={`relative h-3.5 w-3.5 rounded-full border-[2.5px] bg-white/80 shadow-sm ${
+              seen ? "bg-[var(--muted)]/25" : ""
             }`}
             style={{ borderColor: seen ? "#94A3B8" : color }}
             aria-hidden
@@ -211,7 +196,13 @@ export function EventTimelineList({ events }: { events: EventListItemData[] }) {
   if (events.length === 0) return null;
 
   return (
-    <div className="space-y-0">
+    <div className="relative space-y-4">
+      {events.length > 1 ? (
+        <span
+          className="pointer-events-none absolute left-2 top-5 bottom-5 w-px -translate-x-1/2 bg-white/70"
+          aria-hidden
+        />
+      ) : null}
       {events.map((event, index) => (
         <EventListItem
           key={event.id}
