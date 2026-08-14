@@ -159,6 +159,15 @@ export function EventDetailView() {
             <h1 className="page-title mt-3">{event.title}</h1>
           </div>
 
+          <section>
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+              About this event
+            </h2>
+            <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--ink)]/90">
+              {lore}
+            </p>
+          </section>
+
           <div className="grid gap-3 sm:grid-cols-2">
             <InfoBlock label="When">
               <p className="font-medium">{format(startsAt, "EEEE, MMM d, yyyy")}</p>
@@ -192,15 +201,6 @@ export function EventDetailView() {
           >
             {event.isGoing ? "You're going ✓" : "I'm going"}
           </button>
-
-          <section>
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-              About this event
-            </h2>
-            <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--ink)]/90">
-              {lore}
-            </p>
-          </section>
 
           <section className="field space-y-3 rounded-2xl p-4">
             <div>
