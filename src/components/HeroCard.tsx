@@ -4,6 +4,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import type { EventListItemData } from "@/components/EventListItem";
 import { markEventSeenLocal } from "@/lib/viewed-events";
+import { prefetchEvent, seedEventFromList } from "@/lib/event-cache";
 
 export function HeroCard({
   featured,
@@ -51,7 +52,16 @@ export function HeroCard({
   return (
     <Link
       href={`/events/${featured.id}`}
-      onClick={() => markEventSeenLocal(featured.id)}
+      prefetch
+      onClick={() => {
+        markEventSeenLocal(featured.id);
+        seedEventFromList(featured);
+        void prefetchEvent(featured.id);
+      }}
+      onPointerEnter={() => {
+        seedEventFromList(featured);
+        void prefetchEvent(featured.id);
+      }}
       className="surface animate-fade-up block rounded-3xl p-5 transition hover:bg-white/45 active:scale-[0.99]"
     >
       {inner}

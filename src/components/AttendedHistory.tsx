@@ -4,6 +4,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { categoryAccent } from "@/components/EventListItem";
 import { markEventSeenLocal } from "@/lib/viewed-events";
+import { prefetchEvent, seedEventFromList } from "@/lib/event-cache";
 
 export type AttendedEventItem = {
   id: string;
@@ -95,7 +96,16 @@ function AttendedRow({
     <li>
       <Link
         href={`/events/${event.id}`}
-        onClick={() => markEventSeenLocal(event.id)}
+        prefetch
+        onClick={() => {
+          markEventSeenLocal(event.id);
+          seedEventFromList(event);
+          void prefetchEvent(event.id);
+        }}
+        onPointerEnter={() => {
+          seedEventFromList(event);
+          void prefetchEvent(event.id);
+        }}
         className={`surface flex items-start gap-3 rounded-2xl px-3.5 py-3 transition hover:bg-white/50 active:scale-[0.99] ${
           tone === "history" ? "opacity-90" : ""
         }`}

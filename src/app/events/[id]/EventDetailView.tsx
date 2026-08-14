@@ -1,26 +1,48 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { format } from "date-fns";
-import type { EventDetailPayload } from "@/lib/data/events";
 import { markEventSeenLocal } from "@/lib/viewed-events";
+import {
+  getCachedEvent,
+  prefetchEvent,
+  setCachedEvent,
+  type CachedEvent,
+} from "@/lib/event-cache";
 
-type EventDetail = EventDetailPayload["event"];
-
-export function EventDetailView({
-  initialEvent,
-}: {
-  initialEvent: EventDetail;
-}) {
+export function EventDetailView() {
+  const params = useParams<{ id: string }>();
+  const id = params.id;
   const router = useRouter();
-  const [event, setEvent] = useState(initialEvent);
+  const [event, setEvent] = useState<CachedEvent | null>(() =>
+    id ? getCachedEvent(id) : null,
+  );
+  const [error, setError] = useState<string | null>(null);
   const [savingGoing, setSavingGoing] = useState(false);
 
   useEffect(() => {
-    setEvent(initialEvent);
-    markEventSeenLocal(initialEvent.id);
-  }, [initialEvent]);
+    if (!id) return;
+    markEventSeenLocal(id);
+    const cached = getCachedEvent(id);
+    if (cached) setEvent(cached);
+
+    let cancelled = false;
+    async function load() {
+      const next = await prefetchEvent(id);
+      if (cancelled) return;
+      if (next) {
+        setEvent(next);
+        setError(null);
+      } else if (!cached) {
+        setError("Event not found");
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   function goBack() {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -34,7 +56,9 @@ export function EventDetailView({
     if (!event || savingGoing) return;
     setSavingGoing(true);
     const next = !event.isGoing;
-    setEvent({ ...event, isGoing: next });
+    const optimistic = { ...event, isGoing: next };
+    setEvent(optimistic);
+    setCachedEvent(optimistic);
     try {
       const res = await fetch(`/api/events/${event.id}`, {
         method: "PATCH",
@@ -42,13 +66,41 @@ export function EventDetailView({
         body: JSON.stringify({ isGoing: next }),
       });
       if (!res.ok) throw new Error("Failed to update");
-      const json = (await res.json()) as { event: EventDetail };
+      const json = (await res.json()) as { event: CachedEvent };
+      setCachedEvent(json.event);
       setEvent(json.event);
     } catch {
-      setEvent({ ...event, isGoing: !next });
+      const reverted = { ...event, isGoing: !next };
+      setCachedEvent(reverted);
+      setEvent(reverted);
     } finally {
       setSavingGoing(false);
     }
+  }
+
+  if (!event && !error) {
+    return (
+      <p className="py-20 text-center text-sm text-[var(--muted)]">
+        Loading event…
+      </p>
+    );
+  }
+
+  if (error || !event) {
+    return (
+      <main className="space-y-4">
+        <button
+          type="button"
+          onClick={goBack}
+          className="chip inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-[var(--ink)]"
+        >
+          <span aria-hidden>‹</span> Back
+        </button>
+        <p className="surface rounded-3xl p-6 text-center text-sm text-red-600">
+          {error ?? "Event not found"}
+        </p>
+      </main>
+    );
   }
 
   const startsAt = new Date(event.startsAt);
@@ -98,9 +150,7 @@ export function EventDetailView({
                 via {event.source}
               </span>
             </div>
-            <h1 className="page-title mt-3">
-              {event.title}
-            </h1>
+            <h1 className="page-title mt-3">{event.title}</h1>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { format, isToday, isTomorrow, isSameDay } from "date-fns";
 import { markEventSeenLocal, useEventSeen } from "@/lib/viewed-events";
+import { prefetchEvent, seedEventFromList } from "@/lib/event-cache";
 
 export type EventListItemData = {
   id: string;
@@ -58,13 +59,20 @@ export function EventListItem({
 
   function onOpen() {
     markEventSeenLocal(event.id);
+    seedEventFromList(event);
+    void prefetchEvent(event.id);
   }
 
   if (showTimeline) {
     return (
       <Link
         href={`/events/${event.id}`}
+        prefetch
         onClick={onOpen}
+        onPointerEnter={() => {
+          seedEventFromList(event);
+          void prefetchEvent(event.id);
+        }}
         className={`group relative flex gap-3 pb-4 last:pb-0 ${
           seen ? "opacity-70" : ""
         }`}
@@ -151,7 +159,12 @@ export function EventListItem({
   return (
     <Link
       href={`/events/${event.id}`}
+      prefetch
       onClick={onOpen}
+      onPointerEnter={() => {
+        seedEventFromList(event);
+        void prefetchEvent(event.id);
+      }}
       className={`-mx-2 flex items-start gap-3 rounded-2xl px-2 py-3.5 transition hover:bg-white/25 active:scale-[0.99] ${
         seen ? "opacity-70" : ""
       }`}

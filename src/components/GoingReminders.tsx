@@ -4,6 +4,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import type { EventListItemData } from "@/components/EventListItem";
 import { markEventSeenLocal } from "@/lib/viewed-events";
+import { prefetchEvent, seedEventFromList } from "@/lib/event-cache";
 
 export type GoingEventItem = EventListItemData & {
   placeLabel?: string | null;
@@ -19,7 +20,16 @@ export function GoingReminders({ events }: { events: GoingEventItem[] }) {
           <Link
             key={event.id}
             href={`/events/${event.id}`}
-            onClick={() => markEventSeenLocal(event.id)}
+            prefetch
+            onClick={() => {
+              markEventSeenLocal(event.id);
+              seedEventFromList(event);
+              void prefetchEvent(event.id);
+            }}
+            onPointerEnter={() => {
+              seedEventFromList(event);
+              void prefetchEvent(event.id);
+            }}
             className="surface block rounded-3xl p-4 transition hover:bg-white/45 active:scale-[0.99] min-[400px]:p-5"
           >
             <div className="flex items-start justify-between gap-3">
