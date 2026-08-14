@@ -159,14 +159,14 @@ export function UpcomingView({ initialData }: { initialData: EventsPayload }) {
   return (
     <main className="space-y-6">
       <header className="animate-fade-up">
-        <div className="page-header">
+        <div className="flex items-center justify-between gap-3">
           <CitySwitcher
             places={places}
             activePlaceId={placeId ?? data.activePlaceId ?? null}
             onChanged={onPlaceChanged}
           />
           {active ? (
-            <p className="shrink-0 text-xs text-[var(--muted)]">
+            <p className="shrink-0 self-center text-xs leading-none text-[var(--muted)]">
               within {active.radiusKm} km
             </p>
           ) : null}

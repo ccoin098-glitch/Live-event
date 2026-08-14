@@ -14,8 +14,8 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] min-[400px]:px-3 sm:px-4">
-      <div className="nav-island pointer-events-auto flex w-full max-w-md items-center justify-between gap-0.5 rounded-full px-1.5 py-1.5 min-[400px]:max-w-[calc(100vw-1.5rem)] min-[400px]:w-auto min-[400px]:justify-center sm:max-w-lg sm:gap-1 sm:px-2 md:max-w-xl">
+    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4">
+      <div className="nav-island pointer-events-auto flex w-auto max-w-[calc(100vw-1.5rem)] items-center justify-center gap-0.5 rounded-full px-1.5 py-1.5 sm:gap-1 sm:px-2">
         {tabs.map((tab) => {
           const active =
             tab.href === "/"
@@ -27,7 +27,7 @@ export function BottomNav() {
               key={tab.href}
               href={tab.href}
               aria-label={tab.label}
-              className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-2.5 py-2.5 text-[13px] font-medium transition-all duration-200 sm:gap-2 sm:px-3.5 ${
+              className={`flex shrink-0 items-center justify-center gap-1.5 rounded-full px-3 py-2.5 text-[13px] font-medium transition-all duration-200 sm:gap-2 sm:px-3.5 ${
                 active
                   ? "bg-[var(--ink)] !text-white shadow-sm"
                   : "text-[var(--muted)] hover:bg-black/[0.04] hover:text-[var(--ink)]"
@@ -47,7 +47,7 @@ export function BottomNav() {
         })}
 
         <div
-          className="mx-0.5 hidden h-6 w-px shrink-0 bg-black/10 min-[360px]:block sm:mx-1"
+          className="mx-0.5 h-6 w-px shrink-0 bg-black/10 sm:mx-1"
           aria-hidden
         />
 
