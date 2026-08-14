@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { format, startOfMonth } from "date-fns";
+import type { EventsPayload } from "@/lib/data/events";
+import type { ProfilePayload } from "@/lib/data/profile";
+import { cacheAgenda, cacheLocation, cacheUpcoming } from "@/lib/tab-cache";
 
 const tabs = [
   { href: "/", label: "Upcoming", icon: HomeIcon },
@@ -12,6 +16,43 @@ const tabs = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    for (const tab of tabs) {
+      router.prefetch(tab.href);
+    }
+
+    const monthKey = format(startOfMonth(new Date()), "yyyy-MM");
+    let cancelled = false;
+
+    async function warm() {
+      try {
+        const [upcomingRes, agendaRes, locationRes] = await Promise.all([
+          fetch("/api/events"),
+          fetch(`/api/events?month=${monthKey}`),
+          fetch("/api/profile"),
+        ]);
+        if (cancelled) return;
+        if (upcomingRes.ok) {
+          cacheUpcoming((await upcomingRes.json()) as EventsPayload);
+        }
+        if (agendaRes.ok) {
+          cacheAgenda(monthKey, (await agendaRes.json()) as EventsPayload);
+        }
+        if (locationRes.ok) {
+          cacheLocation((await locationRes.json()) as ProfilePayload);
+        }
+      } catch {
+        /* ignore prefetch errors */
+      }
+    }
+
+    void warm();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   return (
     <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4">
@@ -26,6 +67,7 @@ export function BottomNav() {
             <Link
               key={tab.href}
               href={tab.href}
+              prefetch
               aria-label={tab.label}
               className={`flex shrink-0 items-center justify-center gap-1.5 rounded-full px-3 py-2.5 text-[13px] font-medium transition-all duration-200 sm:gap-2 sm:px-3.5 ${
                 active

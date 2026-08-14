@@ -10,6 +10,7 @@ import {
   type PlaceOption,
 } from "@/components/CitySwitcher";
 import type { EventsPayload } from "@/lib/data/events";
+import { cacheUpcoming, tabCache } from "@/lib/tab-cache";
 
 type EventsResponse = {
   profile: {
@@ -45,48 +46,31 @@ function toClientPayload(data: EventsPayload): EventsResponse {
   };
 }
 
-export function UpcomingView({ initialData }: { initialData: EventsPayload }) {
-  const [data, setData] = useState<EventsResponse>(() =>
-    toClientPayload(initialData),
+export function UpcomingView() {
+  const seed = tabCache.upcoming;
+  const [data, setData] = useState<EventsResponse | null>(() =>
+    seed ? toClientPayload(seed) : null,
   );
   const [category, setCategory] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [placeId, setPlaceId] = useState<string | null>(
-    () => initialData.activePlaceId,
+    () => seed?.activePlaceId ?? null,
   );
   const placeIdRef = useRef(placeId);
   const fetchGen = useRef(0);
-  const skipClientFetch = useRef(true);
-  const initialDataRef = useRef(initialData);
 
   placeIdRef.current = placeId;
 
   useEffect(() => {
-    // Ignore stale RSC refreshes that still report the previous city.
-    if (initialData === initialDataRef.current) return;
-    initialDataRef.current = initialData;
-    const next = toClientPayload(initialData);
-    if (placeIdRef.current && next.activePlaceId !== placeIdRef.current) {
-      return;
-    }
-    setData(next);
-    if (next.activePlaceId) setPlaceId(next.activePlaceId);
-  }, [initialData]);
-
-  useEffect(() => {
-    if (skipClientFetch.current && category === null && reloadToken === 0) {
-      skipClientFetch.current = false;
-      return;
-    }
-    skipClientFetch.current = false;
-
     const gen = ++fetchGen.current;
     const controller = new AbortController();
+    const hasContent = data != null;
 
     async function load() {
-      setRefreshing(true);
+      if (!hasContent) setRefreshing(true);
+      else setRefreshing(true);
       setError(null);
       try {
         const params = new URLSearchParams();
@@ -98,9 +82,8 @@ export function UpcomingView({ initialData }: { initialData: EventsPayload }) {
           signal: controller.signal,
         });
         if (!res.ok) throw new Error("Failed to load events");
-        const json = (await res.json()) as EventsResponse;
+        const json = (await res.json()) as EventsPayload;
         if (gen !== fetchGen.current) return;
-        // Drop responses that don't match the city we asked for.
         if (
           active &&
           json.activePlaceId &&
@@ -108,12 +91,15 @@ export function UpcomingView({ initialData }: { initialData: EventsPayload }) {
         ) {
           return;
         }
-        setData(json);
+        cacheUpcoming(json);
+        setData(toClientPayload(json));
         if (json.activePlaceId) setPlaceId(json.activePlaceId);
       } catch (e) {
         if (controller.signal.aborted) return;
         if (gen !== fetchGen.current) return;
-        setError(e instanceof Error ? e.message : "Something went wrong");
+        if (!hasContent) {
+          setError(e instanceof Error ? e.message : "Something went wrong");
+        }
       } finally {
         if (gen === fetchGen.current) setRefreshing(false);
       }
@@ -122,6 +108,7 @@ export function UpcomingView({ initialData }: { initialData: EventsPayload }) {
     return () => {
       controller.abort();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed only for first paint
   }, [category, reloadToken]);
 
   useEffect(() => {
@@ -137,24 +124,26 @@ export function UpcomingView({ initialData }: { initialData: EventsPayload }) {
     if (nextId !== undefined) {
       setPlaceId(nextId);
       placeIdRef.current = nextId;
-      setData((prev) => ({
-        ...prev,
-        activePlaceId: nextId,
-        // Clear events immediately so we don't flash the previous city's list.
-        events: nextId === prev.activePlaceId ? prev.events : [],
-      }));
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              activePlaceId: nextId,
+              events: nextId === prev.activePlaceId ? prev.events : [],
+            }
+          : prev,
+      );
     }
-    skipClientFetch.current = false;
     setReloadToken((n) => n + 1);
   }
 
-  const places = data.places ?? [];
+  const places = data?.places ?? [];
   const active =
-    places.find((p) => p.id === (placeId ?? data.activePlaceId)) ??
+    places.find((p) => p.id === (placeId ?? data?.activePlaceId)) ??
     places[0] ??
     null;
   const cityShort = active?.label ?? "";
-  const goingEvents = data.goingEvents ?? [];
+  const goingEvents = data?.goingEvents ?? [];
 
   return (
     <main className="space-y-6">
@@ -162,7 +151,7 @@ export function UpcomingView({ initialData }: { initialData: EventsPayload }) {
         <div className="flex items-center justify-between gap-3">
           <CitySwitcher
             places={places}
-            activePlaceId={placeId ?? data.activePlaceId ?? null}
+            activePlaceId={placeId ?? data?.activePlaceId ?? null}
             onChanged={onPlaceChanged}
           />
           {active ? (
@@ -173,7 +162,7 @@ export function UpcomingView({ initialData }: { initialData: EventsPayload }) {
         </div>
       </header>
 
-      {data.todayCelebration ? (
+      {data?.todayCelebration ? (
         <CelebrationBanner name={data.todayCelebration.name} />
       ) : null}
 
@@ -187,19 +176,24 @@ export function UpcomingView({ initialData }: { initialData: EventsPayload }) {
             {error}
           </div>
         )}
-        {!error && places.length === 0 && (
+        {!data && !error && (
+          <div className="surface rounded-3xl px-4 py-8 text-center text-sm text-[var(--muted)]">
+            Loading…
+          </div>
+        )}
+        {data && !error && places.length === 0 && (
           <div className="surface rounded-3xl px-4 py-8 text-center text-sm text-[var(--muted)]">
             Add a city on Location, then tap the search icon in the nav to find
             events.
           </div>
         )}
-        {!error && places.length > 0 && data.events.length === 0 && (
+        {data && !error && places.length > 0 && data.events.length === 0 && (
           <div className="surface rounded-3xl px-4 py-8 text-center text-sm text-[var(--muted)]">
             No events for {cityShort} yet. Tap the search icon on the right of
             the nav.
           </div>
         )}
-        {!error && data.events.length > 0 && (
+        {data && !error && data.events.length > 0 && (
           <EventDayGroups events={data.events} />
         )}
       </section>

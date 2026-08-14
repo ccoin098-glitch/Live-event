@@ -529,6 +529,38 @@ export async function setActivePlace(placeId: string): Promise<AppPlace> {
   return (await getPlaceById(placeId))!;
 }
 
+export async function updatePlaceRadius(
+  placeId: string,
+  radiusKm: number,
+): Promise<AppPlace> {
+  const place = await getPlaceById(placeId);
+  if (!place) throw new Error("Place not found");
+
+  const clamped = Math.min(100, Math.max(5, Math.round(radiusKm / 5) * 5));
+
+  await withSupabase(
+    async () => {
+      const supabase = createServiceClient();
+      const { error } = await supabase
+        .from("places")
+        .update({
+          radius_km: clamped,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", placeId);
+      if (error) throw new Error(error.message);
+    },
+    async () => {
+      await prisma.place.update({
+        where: { id: placeId },
+        data: { radiusKm: clamped },
+      });
+    },
+  );
+
+  return (await getPlaceById(placeId))!;
+}
+
 export async function deletePlace(placeId: string): Promise<void> {
   const profile = await ensureProfile();
   await withSupabase(

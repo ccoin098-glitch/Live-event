@@ -10,6 +10,7 @@ import {
   type PlaceOption,
 } from "@/components/CitySwitcher";
 import type { EventsPayload } from "@/lib/data/events";
+import { cacheAgenda, tabCache } from "@/lib/tab-cache";
 
 type DayCount = {
   date: string;
@@ -37,31 +38,23 @@ function toClientPayload(data: EventsPayload): EventsResponse {
   };
 }
 
-export function AgendaView({
-  initialData,
-  initialMonthKey,
-}: {
-  initialData: EventsPayload;
-  initialMonthKey: string;
-}) {
-  const [month, setMonth] = useState(() => {
-    const [y, m] = initialMonthKey.split("-").map(Number);
-    return startOfMonth(new Date(y, m - 1, 1));
-  });
+export function AgendaView() {
+  const nowMonthKey = format(startOfMonth(new Date()), "yyyy-MM");
+  const seed =
+    tabCache.agenda?.monthKey === nowMonthKey ? tabCache.agenda.data : null;
+
+  const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selected, setSelected] = useState(() => new Date());
-  const [data, setData] = useState<EventsResponse>(() =>
-    toClientPayload(initialData),
+  const [data, setData] = useState<EventsResponse | null>(() =>
+    seed ? toClientPayload(seed) : null,
   );
   const [refreshing, setRefreshing] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const [placeId, setPlaceId] = useState<string | null>(
-    () => initialData.activePlaceId,
+    () => seed?.activePlaceId ?? null,
   );
   const placeIdRef = useRef(placeId);
   const fetchGen = useRef(0);
-  const serverMonthKey = useRef(initialMonthKey);
-  const skipClientFetch = useRef(true);
-  const initialDataRef = useRef(initialData);
 
   placeIdRef.current = placeId;
 
@@ -69,28 +62,6 @@ export function AgendaView({
   const selectedKey = format(selected, "yyyy-MM-dd");
 
   useEffect(() => {
-    if (initialData === initialDataRef.current) return;
-    initialDataRef.current = initialData;
-    const next = toClientPayload(initialData);
-    if (placeIdRef.current && next.activePlaceId !== placeIdRef.current) {
-      return;
-    }
-    setData(next);
-    serverMonthKey.current = initialMonthKey;
-    if (next.activePlaceId) setPlaceId(next.activePlaceId);
-  }, [initialData, initialMonthKey]);
-
-  useEffect(() => {
-    if (
-      skipClientFetch.current &&
-      monthKey === serverMonthKey.current &&
-      reloadToken === 0
-    ) {
-      skipClientFetch.current = false;
-      return;
-    }
-    skipClientFetch.current = false;
-
     const gen = ++fetchGen.current;
     const controller = new AbortController();
 
@@ -104,7 +75,7 @@ export function AgendaView({
           signal: controller.signal,
         });
         if (!res.ok) throw new Error("Failed to load");
-        const json = (await res.json()) as EventsResponse;
+        const json = (await res.json()) as EventsPayload;
         if (gen !== fetchGen.current) return;
         if (
           active &&
@@ -113,7 +84,8 @@ export function AgendaView({
         ) {
           return;
         }
-        setData(json);
+        cacheAgenda(monthKey, json);
+        setData(toClientPayload(json));
         if (json.activePlaceId) setPlaceId(json.activePlaceId);
       } catch {
         /* keep stale / aborted */
@@ -140,23 +112,26 @@ export function AgendaView({
     if (nextId !== undefined) {
       setPlaceId(nextId);
       placeIdRef.current = nextId;
-      setData((prev) => ({
-        ...prev,
-        activePlaceId: nextId,
-        events: nextId === prev.activePlaceId ? prev.events : [],
-        dayCounts: nextId === prev.activePlaceId ? prev.dayCounts : [],
-      }));
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              activePlaceId: nextId,
+              events: nextId === prev.activePlaceId ? prev.events : [],
+              dayCounts: nextId === prev.activePlaceId ? prev.dayCounts : [],
+            }
+          : prev,
+      );
     }
-    skipClientFetch.current = false;
     setReloadToken((n) => n + 1);
   }
 
-  const events = useMemo(() => data.events ?? [], [data]);
-  const goingEvents = useMemo(() => data.goingEvents ?? [], [data]);
-  const places = data.places ?? [];
+  const events = useMemo(() => data?.events ?? [], [data]);
+  const goingEvents = useMemo(() => data?.goingEvents ?? [], [data]);
+  const places = data?.places ?? [];
   const selectedCelebration = useMemo(() => {
     return (
-      data.dayCounts.find((d) => d.date === selectedKey)?.celebration ?? null
+      data?.dayCounts.find((d) => d.date === selectedKey)?.celebration ?? null
     );
   }, [data, selectedKey]);
 
@@ -175,7 +150,7 @@ export function AgendaView({
           </div>
           <CitySwitcher
             places={places}
-            activePlaceId={placeId ?? data.activePlaceId ?? null}
+            activePlaceId={placeId ?? data?.activePlaceId ?? null}
             onChanged={onPlaceChanged}
           />
         </div>
@@ -186,16 +161,22 @@ export function AgendaView({
         onMonthChange={setMonth}
         selected={selected}
         onSelect={setSelected}
-        dayCounts={data.dayCounts ?? []}
+        dayCounts={data?.dayCounts ?? []}
       />
 
       <div className={refreshing ? "opacity-70 transition-opacity" : ""}>
-        <Timeline
-          day={selected}
-          events={events}
-          goingEvents={goingEvents}
-          celebration={selectedCelebration}
-        />
+        {data ? (
+          <Timeline
+            day={selected}
+            events={events}
+            goingEvents={goingEvents}
+            celebration={selectedCelebration}
+          />
+        ) : (
+          <p className="py-6 text-center text-sm text-[var(--muted)]">
+            Loading…
+          </p>
+        )}
       </div>
     </main>
   );

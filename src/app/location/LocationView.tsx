@@ -1,63 +1,56 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import {
   AttendedHistory,
   type AttendedEventItem,
 } from "@/components/AttendedHistory";
 import { showAppToast } from "@/components/AppToast";
 import type { ProfilePayload } from "@/lib/data/profile";
+import { cacheLocation, tabCache } from "@/lib/tab-cache";
 
 const PRESETS = ["Music", "Food", "Sports", "Arts"] as const;
 
-export function LocationView({ initialData }: { initialData: ProfilePayload }) {
+export function LocationView() {
+  const seed = tabCache.location;
+  const [ready, setReady] = useState(Boolean(seed));
   const [cityOrAddress, setCityOrAddress] = useState("");
   const [radiusKm, setRadiusKm] = useState(25);
   const [preferencesText, setPreferencesText] = useState(
-    initialData.profile.preferencesText,
+    seed?.profile.preferencesText ?? "",
   );
   const [preferenceTags, setPreferenceTags] = useState<string[]>(
-    initialData.profile.preferenceTags ?? [],
+    seed?.profile.preferenceTags ?? [],
   );
   const [upcomingGoing, setUpcomingGoing] = useState<AttendedEventItem[]>(
-    initialData.upcomingGoing,
+    seed?.upcomingGoing ?? [],
   );
   const [attendedHistory, setAttendedHistory] = useState<AttendedEventItem[]>(
-    initialData.attendedHistory,
+    seed?.attendedHistory ?? [],
   );
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [addingCity, setAddingCity] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
-  const skipFirstLoad = useRef(true);
 
   useEffect(() => {
-    setPreferencesText(initialData.profile.preferencesText);
-    setPreferenceTags(initialData.profile.preferenceTags ?? []);
-    setUpcomingGoing(initialData.upcomingGoing);
-    setAttendedHistory(initialData.attendedHistory);
-  }, [initialData]);
-
-  useEffect(() => {
-    if (skipFirstLoad.current) {
-      skipFirstLoad.current = false;
-      return;
-    }
     let cancelled = false;
     async function load() {
       try {
         const res = await fetch("/api/profile");
         const json = (await res.json()) as ProfilePayload;
         if (cancelled) return;
+        cacheLocation(json);
         if (json.profile) {
           setPreferencesText(json.profile.preferencesText);
           setPreferenceTags(json.profile.preferenceTags ?? []);
         }
         setUpcomingGoing(json.upcomingGoing ?? []);
         setAttendedHistory(json.attendedHistory ?? []);
+        setReady(true);
       } catch {
-        /* keep stale */
+        if (!cancelled) setReady(true);
       }
     }
     void load();
@@ -127,6 +120,14 @@ export function LocationView({ initialData }: { initialData: ProfilePayload }) {
     } finally {
       setSavingPrefs(false);
     }
+  }
+
+  if (!ready) {
+    return (
+      <p className="py-20 text-center text-sm text-[var(--muted)]">
+        Loading…
+      </p>
+    );
   }
 
   return (
