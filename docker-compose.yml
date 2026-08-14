@@ -1,0 +1,19 @@
+# Optional: PostgreSQL for production-style local runs.
+# The app defaults to SQLite (see .env.example DATABASE_URL).
+# To use this Compose stack, switch Prisma provider back to postgresql
+# and set DATABASE_URL to the connection string below.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: lockal
+      POSTGRES_PASSWORD: lockal
+      POSTGRES_DB: lockal_events
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

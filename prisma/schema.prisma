@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model UserProfile {
+  id              String   @id @default("singleton")
+  activePlaceId   String?
+  preferencesText String   @default("")
+  /// JSON string array, e.g. ["Music","Food"]
+  preferenceTags  String   @default("[]")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Place {
+  id             String   @id @default(cuid())
+  label          String
+  cityOrAddress  String
+  lat            Float
+  lng            Float
+  countryCode    String   @default("NL")
+  radiusKm       Float    @default(25)
+  lastUsedAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  events         Event[]
+
+  @@index([lastUsedAt])
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  placeId     String
+  place       Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  title       String
+  description String   @default("")
+  category    String   @default("Other")
+  venue       String   @default("")
+  address     String   @default("")
+  lat         Float?
+  lng         Float?
+  distanceKm  Float?
+  startsAt    DateTime
+  endsAt      DateTime?
+  /// llm | ticketmaster | eventbrite
+  source      String
+  sourceUrl   String?
+  externalId  String?
+  imageUrl    String?
+  rawPayload  String?
+  isGoing     Boolean  @default(false)
+  isViewed    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([placeId, source, externalId])
+  @@index([startsAt])
+  @@index([category])
+  @@index([isGoing])
+  @@index([isViewed])
+  @@index([placeId])
+}
+
+model IngestRun {
+  id          String    @id @default(cuid())
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  /// running | success | failed | skipped
+  status      String    @default("running")
+  eventsFound Int       @default(0)
+  error       String?
+}
