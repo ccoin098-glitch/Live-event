@@ -83,13 +83,26 @@ export async function upsertDiscoveredEvents(
   for (const raw of unique) {
     const event = cityHint ? await ensureCoords(raw, cityHint) : raw;
 
-    const lat = event.lat ?? place.lat;
-    const lng = event.lng ?? place.lng;
+    const hasOwnCoords =
+      event.lat != null &&
+      event.lng != null &&
+      Number.isFinite(event.lat) &&
+      Number.isFinite(event.lng) &&
+      !(event.lat === 0 && event.lng === 0);
 
-    const distanceKm = haversineKm(place.lat, place.lng, lat, lng);
+    const lat = hasOwnCoords ? event.lat! : null;
+    const lng = hasOwnCoords ? event.lng! : null;
+    const distanceKm = hasOwnCoords
+      ? Number(haversineKm(place.lat, place.lng, lat!, lng!).toFixed(2))
+      : null;
+
     const slack = Math.max(5, place.radiusKm * 0.08);
-
-    if (distanceKm > place.radiusKm + slack) {
+    // Only enforce radius when we have real venue coordinates (not city-center fakes).
+    if (
+      hasOwnCoords &&
+      distanceKm != null &&
+      distanceKm > place.radiusKm + slack
+    ) {
       continue;
     }
 
@@ -102,7 +115,7 @@ export async function upsertDiscoveredEvents(
       address: event.address ?? "",
       lat,
       lng,
-      distanceKm: Number(distanceKm.toFixed(2)),
+      distanceKm,
       startsAt: event.startsAt,
       endsAt: event.endsAt ?? null,
       source: event.source,

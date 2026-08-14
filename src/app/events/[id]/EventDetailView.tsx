@@ -10,6 +10,8 @@ import {
   setCachedEvent,
   type CachedEvent,
 } from "@/lib/event-cache";
+import { googleMapsUrl } from "@/lib/maps";
+import { tabCache } from "@/lib/tab-cache";
 
 export function EventDetailView() {
   const params = useParams<{ id: string }>();
@@ -105,14 +107,18 @@ export function EventDetailView() {
 
   const startsAt = new Date(event.startsAt);
   const endsAt = event.endsAt ? new Date(event.endsAt) : null;
-  const mapsUrl =
-    event.lat != null && event.lng != null
-      ? `https://www.google.com/maps/search/?api=1&query=${event.lat},${event.lng}`
-      : event.address || event.venue
-        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-            [event.venue, event.address].filter(Boolean).join(", "),
-          )}`
-        : null;
+  const cityHint =
+    event.placeCity ??
+    tabCache.upcoming?.places.find((p) => p.id === event.placeId)?.cityOrAddress ??
+    tabCache.agenda?.data.places.find((p) => p.id === event.placeId)?.cityOrAddress ??
+    null;
+  const mapsUrl = googleMapsUrl({
+    venue: event.venue,
+    address: event.address,
+    lat: event.lat,
+    lng: event.lng,
+    cityHint,
+  });
 
   const lore =
     event.description?.trim() ||
@@ -239,7 +245,7 @@ export function EventDetailView() {
               rel="noreferrer"
               className="chip flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold text-[var(--ink)] transition hover:bg-white/55"
             >
-              Open in Maps
+              Open in Google Maps
             </a>
           ) : null}
         </div>

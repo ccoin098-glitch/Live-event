@@ -243,7 +243,11 @@ export async function getEventDetailPayload(id: string) {
   const event = await getEventById(id);
   if (!event) return null;
   const viewed = event.isViewed ? event : await markEventViewed(id);
-  return { event: serializeEvent(viewed) };
+  const place = await getPlaceById(viewed.placeId);
+  return {
+    event: serializeEvent(viewed),
+    placeCity: place?.cityOrAddress ?? place?.label ?? null,
+  };
 }
 
 export type EventDetailPayload = NonNullable<

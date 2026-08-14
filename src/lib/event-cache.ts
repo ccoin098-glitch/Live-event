@@ -1,7 +1,9 @@
 import type { EventDetailPayload } from "@/lib/data/events";
 import type { EventListItemData } from "@/components/EventListItem";
 
-export type CachedEvent = EventDetailPayload["event"];
+export type CachedEvent = EventDetailPayload["event"] & {
+  placeCity?: string | null;
+};
 
 const cache = new Map<string, CachedEvent>();
 const inflight = new Map<string, Promise<CachedEvent | null>>();
@@ -15,7 +17,10 @@ export function setCachedEvent(event: CachedEvent) {
 }
 
 /** Seed enough detail from a list row so the detail page can paint instantly. */
-export function seedEventFromList(item: EventListItemData) {
+export function seedEventFromList(
+  item: EventListItemData,
+  placeCity?: string | null,
+) {
   const startsAt =
     typeof item.startsAt === "string"
       ? item.startsAt
@@ -43,6 +48,7 @@ export function seedEventFromList(item: EventListItemData) {
     isViewed: true,
     createdAt: existing?.createdAt ?? startsAt,
     updatedAt: existing?.updatedAt ?? startsAt,
+    placeCity: placeCity ?? item.placeLabel ?? existing?.placeCity ?? null,
   };
   cache.set(item.id, seeded);
   return seeded;
@@ -50,10 +56,6 @@ export function seedEventFromList(item: EventListItemData) {
 
 export async function prefetchEvent(id: string): Promise<CachedEvent | null> {
   if (!id) return null;
-  const cached = cache.get(id);
-  if (cached?.description || cached?.imageUrl || cached?.address) {
-    // Already have a fuller payload; still refresh in background below.
-  }
   const existing = inflight.get(id);
   if (existing) return existing;
 
@@ -62,9 +64,16 @@ export async function prefetchEvent(id: string): Promise<CachedEvent | null> {
       const res = await fetch(`/api/events/${id}`);
       if (res.status === 404) return null;
       if (!res.ok) throw new Error("Failed to load event");
-      const json = (await res.json()) as { event: CachedEvent };
-      cache.set(id, json.event);
-      return json.event;
+      const json = (await res.json()) as {
+        event: CachedEvent;
+        placeCity?: string | null;
+      };
+      const merged: CachedEvent = {
+        ...json.event,
+        placeCity: json.placeCity ?? json.event.placeCity ?? null,
+      };
+      cache.set(id, merged);
+      return merged;
     } catch {
       return cache.get(id) ?? null;
     } finally {

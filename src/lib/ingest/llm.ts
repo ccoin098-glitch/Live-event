@@ -467,18 +467,21 @@ async function verifyInRadius(
         lng = geo.lng;
         if (!event.address) event.address = geo.label;
       } else {
-        lat = profile.lat;
-        lng = profile.lng;
-        console.warn(`[ingest/llm] pin-fallback (no geocode): ${event.title}`);
+        // Keep null — never fake city-center coords (breaks Open in Maps).
+        lat = null;
+        lng = null;
+        console.warn(`[ingest/llm] no venue geocode: ${event.title}`);
       }
     }
 
-    const distanceKm = haversineKm(profile.lat, profile.lng, lat!, lng!);
-    if (distanceKm > profile.radiusKm + radiusSlack) {
-      console.warn(
-        `[ingest/llm] drop (too far ${distanceKm.toFixed(1)}km > ${profile.radiusKm}km): ${event.title}`,
-      );
-      continue;
+    if (lat != null && lng != null) {
+      const distanceKm = haversineKm(profile.lat, profile.lng, lat, lng);
+      if (distanceKm > profile.radiusKm + radiusSlack) {
+        console.warn(
+          `[ingest/llm] drop (too far ${distanceKm.toFixed(1)}km > ${profile.radiusKm}km): ${event.title}`,
+        );
+        continue;
+      }
     }
 
     verified.push({
